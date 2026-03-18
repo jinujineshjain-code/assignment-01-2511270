@@ -1,13 +1,34 @@
 ## Anomaly Analysis
 
-### 1. Insert Anomaly
-**Problem:** We cannot insert a new product's details into the database until a customer actually orders it. This is because the table requires an Order ID to create a new row.
-**Example:** In `orders_flat.csv`, notice that all product information (like 'Product_Name' and 'Product_Category') is tied to an 'Order_ID'. If we want to add a new product called "Wireless Mouse" to our catalog, we can't do it until someone buys it.
+### Insert Anomaly
+In the flat file `orders_flat.csv`, it is impossible to add a new product to the system unless an order is also placed for it. For example, if the company starts selling a new product called "Monitor" (P009), there is no way to record its name, category, or price in the spreadsheet without simultaneously creating a fake order for it. All product data is trapped inside the orders rows.
 
-### 2. Update Anomaly
-**Problem:** When data is repeated in multiple rows, updating it in one place but not others leads to inconsistencies.
-**Example:** Look at **Aarav Sharma** (Customer_ID: C001). His name and address are repeated in multiple rows (e.g., Row 2 and Row 3). If Aarav moves to a new house, we have to manually update the 'Customer_Address' in every single row he appears in. If we miss one row, the database will show two different addresses for the same person.
+**Rows/Columns affected:** `product_id`, `product_name`, `category`, `unit_price` — these columns have no independent existence without an `order_id`.
 
-### 3. Delete Anomaly
-**Problem:** Deleting a specific transaction might accidentally result in the permanent loss of unrelated but important data.
-**Example:** Look at **Row 5** (Order_ID: 1004) for customer 'Ananya Iyer'. If we delete this order because she returned the product, and that was her only order in the system, we lose all her information (Name, Email, Address) entirely. We lose the customer just because we deleted a transaction.
+---
+
+### Update Anomaly
+In the flat file, the same sales representative's details (name, email, office address) are repeated across every order they are associated with. For example, `SR01 - Deepak Joshi` appears in dozens of rows with `deepak@corp.com` and `Mumbai HQ, Nariman Point, Mumbai - 400021`. If Deepak Joshi's email changes, every single row containing his data must be updated. Missing even one row creates an inconsistency in the database.
+
+**Rows/Columns affected:** `sales_rep_id`, `sales_rep_name`, `sales_rep_email`, `office_address` — duplicated across all rows for SR01 (e.g., ORD1003, ORD1006, ORD1010, etc.).
+
+---
+
+### Delete Anomaly
+If all orders placed by customer `C003 - Amit Verma` are deleted from the flat file, all information about Amit Verma (his email `amit@gmail.com`, city `Bangalore`, customer ID `C003`) is permanently lost from the system. There is no separate customer record — the customer only exists through their orders.
+
+**Rows/Columns affected:** `customer_id`, `customer_name`, `customer_email`, `customer_city` — deleting orders ORD1132, ORD1185, and others for C003 would erase all trace of this customer.
+
+---
+
+## Normalization Justification
+
+Your manager argues that keeping everything in one table is simpler and that normalization is over-engineering. While this view is understandable for very small, static datasets, it breaks down quickly in a real retail business environment. The `orders_flat.csv` file is a clear example of why.
+
+First, consider data integrity. In the flat file, the sales representative `Deepak Joshi` appears in over 60 rows with the same email and office address repeated every time. If his email changes, someone must update all 60+ rows manually. Miss one row and the data becomes inconsistent — two different emails for the same person. In a normalized schema, `sales_reps` is a separate table with one row per rep. One update fixes everything instantly.
+
+Second, consider storage efficiency and redundancy. Customer `Neha Gupta` (C006) appears in over 30 rows, with her name, email, and city copied each time. In 3NF, her details are stored exactly once in the `customers` table and referenced by a foreign key. This is not over-engineering — it is basic efficiency.
+
+Third, the flat file makes it impossible to store information that doesn't yet have a transaction. You cannot add a new product or a new sales rep to the system without creating a dummy order. In normalized tables, products and reps are independent entities that exist on their own.
+
+Finally, as the business scales — more customers, more products, more reps — a single flat table becomes increasingly difficult to query, maintain, and audit. The normalized schema we designed separates concerns cleanly: `customers`, `products`, `sales_reps`, and `orders` each manage their own data. This is not over-engineering; it is the foundation of reliable, scalable data management.
